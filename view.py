@@ -1,8 +1,13 @@
+import os
+import bcrypt
+
 from flask import Flask, jsonify, request
 from main import app, con
 from funcao import gerar_hash_senha, senha_forte, verificar_senha
 from fpdf import FPDF
 from flask import send_file
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
 
 @app.route('/livro', methods=['GET'])
 def livro():
@@ -25,20 +30,29 @@ def livro():
         cur.close()
 @app.route('/criar_livro', methods=['POST'])
 def criar_livro():
-    data = request.get_json()
-
-    titulo = data.get('titulo')
-    autor = data.get('autor')
-    ano_publicacao = data.get('ano_publicacao')
-
     try:
+        titulo = request.form.get('titulo')
+        autor = request.form.get('autor')
+        ano_publicacao = request.form.get('ano_publicacao')
+        imagem = request.files.get('imagem')
+
+
         cur = con.cursor()
         cur.execute("select 1 from livro where titulo = ?", (titulo,))
         if cur.fetchone():
             return jsonify({"error":"Livro já cadastrado"}), 400
-        cur.execute("""insert into livro(titulo, autor, ano_publicacao) values (?, ?, ?)""", (titulo, autor, ano_publicacao))
+        cur.execute("""insert into livro(titulo, autor, ano_publicacao) values (?, ?, ?) RETURNING id_livro """, (titulo, autor, ano_publicacao))
 
+        codigo_livro = cur.fetchone()[0]
         con.commit()
+
+        caminho_imagem =None
+        if imagem:
+            nome_imagem = f"{codigo_livro}.jpeg"
+            caminho_imagem_destino = os.path.join(app.config['UPLOAD_FOLDER'], "Livros")
+            os.makedirs(caminho_imagem_destino, exist_ok=True)
+            caminho_imagem = os.path.join(caminho_imagem_destino, nome_imagem)
+            imagem.save(caminho_imagem)
 
         return jsonify({
             'message': "Livro cadastrado com sucesso!",
@@ -231,9 +245,6 @@ def excluir_usuario(id_usuario):
     con.commit()
     cur.close()
     return jsonify({'message': 'Usuario exluido com sucesso', 'id_usuario': id})
-
-import bcrypt
-from flask import request, jsonify
 
 @app.route('/login', methods=['POST'])
 def login():

@@ -1,9 +1,12 @@
 import os
-import bcrypt
 
-from flask import Flask, jsonify, request
+import bcrypt
+import pygal
+import threading
+
+from flask import Flask, jsonify, request, Response
 from main import app, con
-from funcao import gerar_hash_senha, senha_forte, verificar_senha
+from funcao import gerar_hash_senha, senha_forte, verificar_senha, enviando_email
 from fpdf import FPDF
 from flask import send_file
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -341,3 +344,34 @@ def pdf_alunos():
     pdf_path = "relatorio_usuario.pdf"
     pdf.output(pdf_path)
     return send_file(pdf_path, as_attachment=True, mimetype='application/pdf')
+
+@app.route('/grafico')
+def grafico():
+    cur = con.cursor()
+    cur.execute(""" Select ano_publicacao, count(*) 
+                    from Livro
+                    group by ano_publicacao 
+                    order by ano_publicacao 
+    """)
+    resultado = cur.fetchall()
+    cur.close()
+
+    grafico = pygal.Bar()
+    grafico.title = "Quantidade de Livros por ano"
+
+    for g in resultado:
+        grafico.add(str(g[0]), g[1])
+    return Response(grafico.render(), mimetype='image/svg+xml')
+
+@app.route('/enviar_email', methods=['POST'])
+def enviar_email():
+    dados = request.json
+    destinatario = dados.get('to')
+    assunto = dados.get('subject')
+    mensagem = dados.get('message')
+
+    thread = threading.Thread(target=enviando_email, args=(assunto, mensagem, destinatario,))
+
+    thread.start()
+
+    return jsonify({'mensagem': "Email enviado com sucesso!"})

@@ -1,5 +1,25 @@
+from email.mime.multipart import MIMEMultipart
+
 import bcrypt
 import re
+
+import smtplib
+from email.mime.text import MIMEText
+
+def enviando_email(destinatario, assunto, mensagem):
+    user = 'kauacardosobarbosasenai@gmail.com'
+    senha = 'oslq efdy idrb qrtx'
+
+    msg = MIMEText(mensagem)
+    msg['From'] = user
+    msg['To'] = destinatario
+    msg['Subject'] = assunto
+
+    server = smtplib.SMTP('smtp.gmail.com', 587)
+    server.starttls()
+    server.login(user, senha)
+    server.send_message(msg)
+    server.quit()
 
 def gerar_hash_senha(senha):
     senha_bytes = senha.encode('utf-8')

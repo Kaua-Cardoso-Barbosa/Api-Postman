@@ -6,6 +6,25 @@ import re
 import smtplib
 from email.mime.text import MIMEText
 
+import jwt
+import datetime
+from main import app
+
+senha_secreta = app.config['SECRET_KEY']
+
+def gerar_token(id_usuario):
+    payload = {'id_usuario': id_usuario, 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=20)}
+    token = jwt.encode(payload, senha_secreta, algorithm='HS256')
+
+    return token
+
+
+def remover_bearer(token):
+    if token.startswith('Bearer '):
+        return token[len('Bearer '):]
+    else:
+        return token
+
 def enviando_email(destinatario, assunto, mensagem):
     user = 'kauacardosobarbosasenai@gmail.com'
     senha = 'oslq efdy idrb qrtx'

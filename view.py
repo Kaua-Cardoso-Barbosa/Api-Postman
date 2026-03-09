@@ -3,10 +3,11 @@ import os
 import bcrypt
 import pygal
 import threading
+import jwt
 
-from flask import Flask, jsonify, request, Response
+from flask import Flask, jsonify, request, Response, make_response
 from main import app, con
-from funcao import gerar_hash_senha, senha_forte, verificar_senha, enviando_email
+from funcao import gerar_hash_senha, senha_forte, verificar_senha, enviando_email, remover_bearer, senha_secreta, gerar_token
 from fpdf import FPDF
 from flask import send_file
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -33,6 +34,20 @@ def livro():
         cur.close()
 @app.route('/criar_livro', methods=['POST'])
 def criar_livro():
+
+    #token = request.headers.get('Authorization')
+    token = request.cookies.get("access_token")
+    if not token:
+        return jsonify({'message': 'Token necessário'}), 401
+    token = remover_bearer(token)
+
+    try:
+        payload = jwt.decode(token, senha_secreta, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return jsonify({'message': 'Token expirado'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'message': 'Token inválido'}), 401
+
     try:
         titulo = request.form.get('titulo')
         autor = request.form.get('autor')
@@ -249,8 +264,45 @@ def excluir_usuario(id_usuario):
     cur.close()
     return jsonify({'message': 'Usuario exluido com sucesso', 'id_usuario': id})
 
-@app.route('/login', methods=['POST'])
-def login():
+# @app.route('/login', methods=['POST'])
+# def login():
+#     data = request.get_json()
+#
+#     usuario = data.get('usuario')
+#     senha = data.get('senha')
+#
+#     if not usuario or not senha:
+#         return jsonify({"error": "Usuario e senha são obrigatórios"}), 400
+#
+#     cur = con.cursor()
+#     cur.execute(
+#         "select id_usuario, nome, usuario, senha from usuario where usuario=?",
+#         (usuario,)
+#     )
+#
+#     usuario_db = cur.fetchone()
+#     cur.close()
+#
+#     if not usuario_db:
+#         return jsonify({"error": "Usuario ou senha inválidos"}), 401
+#
+#     id_usuario, nome, usuario, senha_hash = usuario_db
+#
+#     if not  (senha_hash):
+#         return jsonify({"error": "Usuario ou senha inválidos"}), 401
+#     token = gerar_token(id_usuario)
+#     return jsonify({
+#         "message": "Login realizado com sucesso",
+#         "usuario": {
+#             "id_usuario": id_usuario,
+#             "nome": nome,
+#             "usuario": usuario,
+#             "token" : token
+#         }
+#     }), 200
+
+@app.route('/login_cookies', methods=['POST'])
+def login_cokies():
     data = request.get_json()
 
     usuario = data.get('usuario')
@@ -275,15 +327,22 @@ def login():
 
     if not  (senha_hash):
         return jsonify({"error": "Usuario ou senha inválidos"}), 401
+    token = gerar_token(id_usuario)
+    resp = make_response(jsonify({'mensagem': 'Logado com sucesso'}), 200)
+    resp.set_cookie("access_token", token, httponly=True, secure=False, samesite='Lax', path="/", max_age=3600)
+    return resp
 
-    return jsonify({
-        "message": "Login realizado com sucesso",
-        "usuario": {
-            "id_usuario": id_usuario,
-            "nome": nome,
-            "usuario": usuario
-        }
-    }), 200
+
+    # return jsonify({
+    #     "message": "Login realizado com sucesso",
+    #     "usuario": {
+    #         "id_usuario": id_usuario,
+    #         "nome": nome,
+    #         "usuario": usuario,
+    #         "token" : token
+    #     }
+    # }), 200
+
 
 @app.route('/pfd_livro', methods=['GET'])
 def pdf_livro():

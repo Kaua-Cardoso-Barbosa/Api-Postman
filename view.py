@@ -425,12 +425,13 @@ def grafico():
 @app.route('/enviar_email', methods=['POST'])
 def enviar_email():
     dados = request.json
-    destinatario = dados.get('to')
+
     assunto = dados.get('subject')
     mensagem = dados.get('message')
+    destinatario = dados.get('to')
 
-    thread = threading.Thread(target=enviando_email, args=(assunto, mensagem, destinatario,))
+    thread = threading.Thread(target=enviando_email, args=(assunto, mensagem, destinatario))
 
     thread.start()
 
-    return jsonify({'mensagem': "Email enviado com sucesso!"})
+    return jsonify({'mensagem': 'Email enviado com sucesso'}), 200
